@@ -330,7 +330,7 @@
           <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 11.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
         </svg>
       </div>
-      <h2 style="color: #8A05BE; margin: 0; font-size: 22px; font-weight: bold;">Passagem de Carga ModDF_v2807.3</h2>
+      <h2 style="color: #8A05BE; margin: 0; font-size: 22px; font-weight: bold;">Passagem de Carga ModDF_v2807.4</h2>
       <p style="color: #666; margin: 5px 0 0 0; font-size: 14px;">Selecione o estado de expedição</p>
     </div>
 
@@ -3791,8 +3791,18 @@ function checarColunaDispatch() {
 }
 
 function monitorarColunaDispatch24h() {
-  // Se a URL do script sumir ou não estiver disponível por algum motivo, interrompe o loop
+  // 1. Barreira de Segurança: Se a URL do script sumir da sessão, interrompe o loop
   if (!WEB_APP_URL) return;
+
+  // Resgata com segurança as variáveis e constantes do escopo global
+  const diretrizGlobal = (typeof UFS_RESTRITAS_MONITORAMENTO !== 'undefined') ? UFS_RESTRITAS_MONITORAMENTO : "";
+  const ufAtualLimpa = (typeof UF_SELECIONADA !== 'undefined') ? UF_SELECIONADA.trim().toUpperCase() : "";
+  
+  // Transforma a sua string separada por vírgula em um Array limpo na memória RAM
+  const listaUfsExibirDireto = diretrizGlobal.split(",").map(function(item) { return item.trim().toUpperCase(); });
+  
+  // Verifica em milissegundos se a UF atual faz parte da lista de liberação direta (Match)
+  const deuMatchNaDiretrizGlobal = listaUfsExibirDireto.includes(ufAtualLimpa) && ufAtualLimpa !== "";
 
   var urlFinal = WEB_APP_URL + "?action=verificarCelulaDispatch";
 
@@ -3803,22 +3813,47 @@ function monitorarColunaDispatch24h() {
     .then(function(data) {
       var linkTokens = document.getElementById("lnkTokensConf");
       if (linkTokens) {
-        // Se a coluna R (DISPATCH) tiver pelo menos 1 célula preenchida, mostra o link
+        
+        // Se a coluna R (DISPATCH) tiver pelo menos 1 célula preenchida, mostra o link normalmente
         if (data && data.possuiDados === true) {
           linkTokens.classList.remove("hidden");
+          linkTokens.style.display = "inline-block"; // Garante renderização física
         } else {
-          linkTokens.classList.add("hidden");
+          // =========================================================================
+          // 🛑 A INTERCEPTAÇÃO CIRÚRGICA (SKIP STEP)
+          // =========================================================================
+          if (deuMatchNaDiretrizGlobal) {
+            // Se a coluna está vazia MAS a UF está na lista -> PULA A OCULTAÇÃO (NÃO ESCONDE!)
+            console.log(`🔓 [MONITOR 24H SKIP] Coluna R vazia, mas UF [${ufAtualLimpa}] está na lista de exceção. Mantendo link visível.`);
+            linkTokens.classList.remove("hidden");
+            linkTokens.style.display = "inline-block";
+          } else {
+            // Se a coluna está vazia E a UF NÃO está na lista -> Oculta o link por padrão
+            console.log(`🔒 [MONITOR 24H LOCK] Coluna R vazia para a UF [${ufAtualLimpa}]. Ocultando link.`);
+            linkTokens.classList.add("hidden");
+            linkTokens.style.display = "none";
+          }
+          // =========================================================================
         }
+        
       }
     })
     .catch(function(err) {
       console.error("Erro no monitoramento automático da aba ROMANEIOS:", err);
+      
+      // Fallback de Segurança caso a API do Google caia: Se der match na lista, mantém visível
+      var linkTokens = document.getElementById("lnkTokensConf");
+      if (linkTokens && deuMatchNaDiretrizGlobal) {
+        linkTokens.classList.remove("hidden");
+        linkTokens.style.display = "inline-block";
+      }
     })
     .finally(function() {
-      // Agenda a próxima verificação para daqui a 30 segundos exatos de forma perpétua
+      // Garante o agendamento da próxima verificação para daqui a 30 segundos exatos de forma perpétua
       setTimeout(monitorarColunaDispatch24h, 30000);
     });
 }
+
 
 /**
  * ETAPA ATUAL: Controla a exibição do link baseado na correspondência da UF
