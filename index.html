@@ -330,7 +330,7 @@
           <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 11.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
         </svg>
       </div>
-      <h2 style="color: #8A05BE; margin: 0; font-size: 22px; font-weight: bold;">Passagem de Carga ModDF_v2807.4</h2>
+      <h2 style="color: #8A05BE; margin: 0; font-size: 22px; font-weight: bold;">Passagem de Carga ModDF_v2807.5</h2>
       <p style="color: #666; margin: 5px 0 0 0; font-size: 14px;">Selecione o estado de expedição</p>
     </div>
 
@@ -1435,54 +1435,154 @@ async function efetuarCadastro() {
             callServer('getTransportadorasList', {}, 'cbTransp');
         }
 
-        function carregarTokensPendentes() {
-          const listaEl = document.getElementById('listaTokensPendentes');
-          listaEl.innerHTML = 'Buscando dados...';
-          
-          document.getElementById('modalPendentes').style.display = 'flex';
-          document.getElementById('modalPendentes').classList.remove('hidden');
-        
-          // NOVO: Captura dinamicamente o operador logado exibido na tela
-          const inputOperador = document.getElementById('operadorLogadoDisplay');
-          const operadorAtivo = inputOperador ? encodeURIComponent(inputOperador.value.trim()) : '';
+function carregarTokensPendentes() {
+  // 1. CHAVEAMENTO E ROTEAMENTO CIRÚRGICO POR DIRETRIZ GLOBAL
+  const diretrizGlobal = (typeof UFS_RESTRITAS_MONITORAMENTO !== 'undefined') ? UFS_RESTRITAS_MONITORAMENTO : "";
+  const ufAtualLimpa = (typeof UF_SELECIONADA !== 'undefined') ? UF_SELECIONADA.trim().toUpperCase() : "";
+  
+  const listaUfsRestritas = diretrizGlobal.split(",").map(function(item) { return item.trim().toUpperCase(); });
+  const isUfRestrita = listaUfsRestritas.includes(ufAtualLimpa) && ufAtualLimpa !== "";
 
-          // ADAPTAÇÃO CRÍTICA: Injeta o parâmetro do operador na URL da requisição GET
-          fetch(`${WEB_APP_URL}?action=getTokensPendentes&operador=${operadorAtivo}`)
-            .then(response => response.json())
-            .then(res => {
-              if (res.success) {
-                if (res.dados.length === 0) {
-                  listaEl.innerHTML = '<p style="color: green; font-weight: bold; text-align: center;">🎉 Nenhum token pendente! Tudo conferido.</p>';
-                  return;
-                }
+  // Captura dinâmica do operador ativo na interface
+  const inputOperador = document.getElementById('operadorLogadoDisplay');
+  const operadorAtivo = inputOperador ? encodeURIComponent(inputOperador.value.trim()) : '';
+
+  // Configuração dinâmica das IDs de elementos e rotas baseada no match da UF
+  let idModal, idLista, actionRota;
+
+  if (isUfRestrita) {
+    console.log(`🔀 [ROTEAMENTO MODAL] UF [${ufAtualLimpa}] restrita. Direcionando para o Modal Direto.`);
+    idModal = 'modalPendentesDireto';
+    idLista = 'bodyPendentesDireto';       // ID do container interno do novo modal
+    actionRota = 'getTokensPendentesDireto'; // Nova action de backend (Critérios 1 e 2 apenas)
+  } else {
+    console.log(`🔄 [ROTEAMENTO MODAL] UF [${ufAtualLimpa}] comum. Direcionando para o Modal Padrão.`);
+    idModal = 'modalPendentes';
+    idLista = 'listaTokensPendentes';      // ID do container interno original
+    actionRota = 'getTokensPendentes';       // Mantém a action original intacta (3 Critérios)
+  }
+
+  // 2. CONTROLE VISUAL E PREPARAÇÃO DA INTERFACE (UI)
+  const listaEl = document.getElementById(idLista);
+  const modalEl = document.getElementById(idModal);
+
+  if (!listaEl || !modalEl) {
+    console.error(`❌ Erro crítico: Elementos de interface não localizados no DOM (${idLista} / ${idModal}).`);
+    return;
+  }
+
+  // Define o estado carregando inicial apropriado para cada layout
+  if (isUfRestrita) {
+    // Configura o cabeçalho dinâmico do novo modal e resgata as divs auxiliares
+    const lblUf = document.getElementById("lblUfDireta");
+    if (lblUf) lblUf.textContent = ufAtualLimpa;
+    
+    const loadingDiv = document.getElementById("loadingDireto");
+    const containerTabela = document.getElementById("containerTabelaDireta");
+    
+    if (loadingDiv) loadingDiv.style.display = "block";
+    if (containerTabela) {
+      containerTabela.style.display = "none";
+      containerTabela.classList.add("hidden");
+    }
+  } else {
+    listaEl.innerHTML = 'Buscando dados...';
+  }
+  
+  // Abre fisicamente o modal selecionado na tela
+  modalEl.style.display = 'flex';
+  modalEl.classList.remove('hidden');
+
+  // 3. EXECUÇÃO DA REQUISIÇÃO ASSÍNCRONA VIA FETCH (COMPARTILHADA)
+  fetch(`${WEB_APP_URL}?action=${actionRota}&operador=${operadorAtivo}&uf=${ufAtualLimpa}`)
+    .then(response => response.json())
+    .then(res => {
+      if (res.success) {
         
-                let htmlLista = '<ul style="list-style: none; padding: 0; margin: 0;">';
-                res.dados.forEach(item => {
-                  // 🚨 ADAPTAÇÃO VISUAL: Se for um token de tratativa, muda o estilo e adiciona legenda
-                  const corToken = item.isTratativa ? '#2E7D32' : '#8A05BE'; 
-                  const sufixoTexto = item.isTratativa ? ' <span style="font-size:11px; font-weight:normal; color:#2E7D32;">(Tratativa)</span>' : '';
-        
-                  htmlLista += `<li style="padding: 10px 0; border-bottom: 1px solid #eee; font-size: 13px;">
-                    <div><strong>Transp:</strong> ${item.transp}</div>
-                    <div style="margin-top: 4px;">
-                      <span>Romaneio: <strong>${item.romaneio}</strong></span>
-                      <span style="color: ${corToken}; float: right;">Token: <strong>${item.token}</strong>${sufixoTexto}</span>
-                    </div>
-                  </li>`;
-                });
-                htmlLista += '</ul>';
-                listaEl.innerHTML = htmlLista;
-              } else {
-                listaEl.innerHTML = `<p style="color: red;">Erro: ${res.error}</p>`;
-              }
-            })
-            .catch(err => {
-              listaEl.innerHTML = '<p style="color: red;">Falha na conexão com o servidor.</p>';
-              console.error(err);
-		     dispararLogOL("SISTEMA_ERRO_CAPTURA", `Erro não tratado capturado no console: [${err.toString()}]`);
-	
-            });
+        // Trata o cenário de lista vazia
+        if (res.dados.length === 0) {
+          if (isUfRestrita) {
+            document.getElementById("loadingDireto").style.display = "none";
+            document.getElementById("containerTabelaDireta").style.display = "block";
+            document.getElementById("containerTabelaDireta").classList.remove("hidden");
+            listaEl.innerHTML = '<tr><td colspan="3" style="color: green; font-weight: bold; text-align: center; padding: 20px;">🎉 Nenhum token pendente! Tudo conferido.</td></tr>';
+          } else {
+            listaEl.innerHTML = '<p style="color: green; font-weight: bold; text-align: center;">🎉 Nenhum token pendente! Tudo conferido.</p>';
+          }
+          return;
         }
+
+        // Renderização dinâmica baseada no layout estrutural correspondente
+        if (isUfRestrita) {
+          // GERAÇÃO DO LAYOUT EM TABELA (<tr>/<td>) PARA O NOVO MODAL DIRETO
+          let htmlLinhas = '';
+          res.dados.forEach(item => {
+            const corToken = item.isTratativa ? '#2E7D32' : '#8A05BE'; 
+            const sufixoTexto = item.isTratativa ? ' <span style="font-size:11px; font-weight:normal; color:#2E7D32;"><br>(Tratativa)</span>' : '';
+
+            htmlLinhas += `<tr style="border-bottom: 1px solid #eee;">
+              <td style="padding: 10px;"><strong>${item.romaneio}</strong><br><span style="font-size:11px; color:#666;">${item.transp}</span></td>
+              <td style="padding: 10px; color: ${corToken}; font-weight: bold;">${item.token}${sufixoTexto}</td>
+              <td style="padding: 10px; text-align: center;">
+                <button onclick="navigator.clipboard.writeText('${item.token}'); alert('Token copiado!');" style="background: #8A05BE; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 12px;">Copiar</button>
+              </td>
+            </tr>`;
+          });
+          
+          // Oculta o indicador de loading e exibe a tabela fisicamente
+          document.getElementById("loadingDireto").style.display = "none";
+          document.getElementById("containerTabelaDireta").style.display = "block";
+          document.getElementById("containerTabelaDireta").classList.remove("hidden");
+          listaEl.innerHTML = htmlLinhas;
+
+        } else {
+          // GERAÇÃO DO LAYOUT EM LISTA (<ul>/<li>) ORIGINAL PARA O MODAL PADRÃO
+          let htmlLista = '<ul style="list-style: none; padding: 0; margin: 0;">';
+          res.dados.forEach(item => {
+            const corToken = item.isTratativa ? '#2E7D32' : '#8A05BE'; 
+            const sufixoTexto = item.isTratativa ? ' <span style="font-size:11px; font-weight:normal; color:#2E7D32;">(Tratativa)</span>' : '';
+
+            htmlLista += `<li style="padding: 10px 0; border-bottom: 1px solid #eee; font-size: 13px;">
+              <div><strong>Transp:</strong> ${item.transp}</div>
+              <div style="margin-top: 4px;">
+                <span>Romaneio: <strong>${item.romaneio}</strong></span>
+                <span style="color: ${corToken}; float: right;">Token: <strong>${item.token}</strong>${sufixoTexto}</span>
+              </div>
+            </li>`;
+          });
+          htmlLista += '</ul>';
+          listaEl.innerHTML = htmlLista;
+        }
+
+      } else {
+        exibirMensagemErroInterno(listaEl, isUfRestrita, `Erro: ${res.error}`);
+      }
+    })
+    .catch(err => {
+      exibirMensagemErroInterno(listaEl, isUfRestrita, 'Falha na conexão com o servidor.');
+      console.error(err);
+      dispararLogOL("SISTEMA_ERRO_CAPTURA", `Erro não tratado capturado no console: [${err.toString()}]`);
+    });
+}
+
+/**
+ * Função utilitária para tratamento unificado de layouts de erro
+ */
+function exibirMensagemErroInterno(elemento, isDireto, mensagem) {
+  if (isDireto) {
+    const loading = document.getElementById("loadingDireto");
+    const container = document.getElementById("containerTabelaDireta");
+    if (loading) loading.style.display = "none";
+    if (container) {
+      container.style.display = "block";
+      container.classList.remove("hidden");
+    }
+    elemento.innerHTML = `<tr><td colspan="3" style="color: red; text-align: center; padding: 20px;">${mensagem}</td></tr>`;
+  } else {
+    elemento.innerHTML = `<p style="color: red;">${mensagem}</p>`;
+  }
+}
+
 
 
         
@@ -3904,6 +4004,39 @@ function aplicarCondicionalVisualLinkTokens() {
   }
 }
 
+/**
+ * Fecha fisicamente o novo modal de conferência direta
+ */
+function fecharModalPendentesDireto() {
+  const modal = document.getElementById("modalPendentesDireto");
+  if (modal) {
+    modal.style.display = "none";
+    modal.classList.add("hidden");
+  }
+}
+
+/**
+ * Zera o layout interno e exibe o esqueleto do modal na tela do operador
+ */
+function abrirModalPendentesDireto(uf) {
+  const modal = document.getElementById("modalPendentesDireto");
+  const lblUf = document.getElementById("lblUfDireta");
+  const loading = document.getElementById("loadingDireto");
+  const containerTabela = document.getElementById("containerTabelaDireta");
+  const bodyTabela = document.getElementById("bodyPendentesDireto");
+
+  if (modal && lblUf && loading && containerTabela && bodyTabela) {
+    lblUf.textContent = uf;
+    bodyTabela.innerHTML = ""; // Higieniza dados residuais
+    loading.style.display = "block";
+    containerTabela.style.display = "none";
+    containerTabela.classList.add("hidden");
+    
+    modal.style.display = "flex";
+    modal.classList.remove("hidden");
+  }
+}
+
 		
 </script>
 
@@ -3992,7 +4125,43 @@ function aplicarCondicionalVisualLinkTokens() {
         </div>
     </div>
 
-    
+	<!-- =========================================================================
+	     🆕 NOVO COMPONENTE: MODAL DE CONFERÊNCIA DIRETA (UFS RESTRITAS)
+	     ========================================================================= -->
+	<div id="modalPendentesDireto" class="hidden" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1000; align-items: center; justify-content: center;">
+	    <div style="background: #FFF; width: 90%; max-width: 600px; border-radius: 8px; padding: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); max-height: 80vh; overflow-y: auto;">
+	        
+	        <!-- Cabeçalho do Painel -->
+	        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #8A05BE; padding-bottom: 10px; margin-bottom: 15px;">
+	            <h3 style="color: #8A05BE; margin: 0; font-size: 18px;">📋 Painel de Conferência Direta (<span id="lblUfDireta">--</span>)</h3>
+	            <button onclick="fecharModalPendentesDireto()" style="background: none; border: none; font-size: 20px; font-weight: bold; color: #666; cursor: pointer;">&times;</button>
+	        </div>
+	
+	        <!-- Área de Renderização Dinâmica de Dados -->
+	        <div id="loadingDireto" style="text-align: center; padding: 20px;">
+	            <span class="spinner"></span> Carregando romaneios operacionais...
+	        </div>
+	
+	        <div id="containerTabelaDireta" class="hidden" style="display: none;">
+	            <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 14px;">
+	                <thead>
+	                    <tr style="background: #F4F4F4; border-bottom: 2px solid #DDD;">
+	                        <th style="padding: 10px;">Romaneio</th>
+	                        <th style="padding: 10px;">Token</th>
+	                        <th style="padding: 10px; text-align: center;">Ação</th>
+	                    </tr>
+	                </thead>
+	                <tbody id="bodyPendentesDireto">
+	                    <!-- Linhas físicas de romaneios injetadas via JavaScript -->
+	                </tbody>
+	            </table>
+	        </div>
+	
+	    </div>
+	</div>
+
+
+	
     <!-- Modal de Autenticação Segura (Senha Oculta) -->
     <div id="modalSenhaDevolucao" class="modal-overlay hidden" style="display: none; background: rgba(0,0,0,0.6); position: fixed; inset: 0; align-items: center; justify-content: center; z-index: 1100;">
       <div class="modal-content" style="background: white; padding: 25px; border-radius: 8px; max-width: 350px; width: 100%; box-shadow: 0 4px 15px rgba(0,0,0,0.3); text-align: center;">
