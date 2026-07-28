@@ -330,7 +330,7 @@
           <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 11.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
         </svg>
       </div>
-      <h2 style="color: #8A05BE; margin: 0; font-size: 22px; font-weight: bold;">Passagem de Carga ModDF_v2807.1</h2>
+      <h2 style="color: #8A05BE; margin: 0; font-size: 22px; font-weight: bold;">Passagem de Carga ModDF_v2807.2</h2>
       <p style="color: #666; margin: 5px 0 0 0; font-size: 14px;">Selecione o estado de expedição</p>
     </div>
 
@@ -631,7 +631,10 @@
 		  // "TO": "https://script.google.com/macros/s/AKfycbxeW2tRPFpnompPApN4XxeY2DWnZLoIzmzenf8zEdOXctNgtrw-l71ZLGn6QpTOTZkc/exec" 
 	  // Adicione as demais UFs conforme criar as planilhas/scripts clonados...
 	};
-	
+
+	// Lista de UFs que devem IGNORAR o monitoramento DISPATCH ou pular etapas específicas
+	const UFS_RESTRITAS_MONITORAMENTO = "PR"; //FORMATO:"SP,RJ,MG"; 
+		
 	// Variável de controle mestre (Substitui a constante WEB_APP_URL fixa antiga)
 	let WEB_APP_URL = ""; 
 	let UF_SELECIONADA = ""; // Guarda o estado escolhido globalmente no Front-OL
@@ -2542,9 +2545,33 @@ window.addEventListener('beforeunload', function (event) {
 	      }
 	
 	      // 4. Oculta o modal liberando o acesso ao formulário por baixo
+	      // 4. Oculta o modal liberando o acesso ao formulário por baixo
 	      modal.style.display = 'none';
-	      console.log("Mapeamento de rede do Front-OL atualizado para:", UF_SELECIONADA, "->", WEB_APP_URL);
-	      dispararLogOL("ROTEAMENTO_REDE_UF", `Mapeamento de rede do Front-OL atualizado para: [${UF_SELECIONADA} -> ${WEB_APP_URL}]`);
+	      console.log("Mapeamento de rede do Front-OL updated to:", UF_SELECIONADA, "->", WEB_APP_URL);
+	      dispararLogOL("ROTEAMENTO_REDE_UF", `Mapeamento de rede do Front-OL updated to: [${UF_SELECIONADA} -> ${WEB_APP_URL}]`);
+
+	      // =========================================================================
+	      // 🛡️ AVALIAÇÃO DA DIRETRIZ GLOBAL (SHOW / HIDE CONDICIONAL)
+	      // =========================================================================
+	      const lnkElement = document.getElementById("lnkTokensConf");
+	      if (lnkElement) {
+	        // Transforma a constante delimitada por vírgula em um array limpo
+	        const listaUfsExibirDireto = UFS_IGNORAR_MONITORAMENTO.split(",").map(item => item.trim().toUpperCase());
+	        const ufAtualLimpa = UF_SELECIONADA.trim().toUpperCase();
+
+	        if (listaUfsExibirDireto.includes(ufAtualLimpa)) {
+	          // SE DER MATCH: NÃO ESCONDE! Força a exibição imediata na interface
+	          console.log(`🔓 [MATCH GLOBAL] UF [${ufAtualLimpa}] cadastrada em UFS_IGNORAR_MONITORAMENTO. Exibindo link.`);
+	          lnkElement.classList.remove("hidden");
+	          lnkElement.style.display = "inline-block"; // Garante a renderização visual
+	        } else {
+	          // SE NÃO DER MATCH: Força a remoção visual e mantém oculto por padrão
+	          console.log(`🔒 [SEM MATCH] UF [${ufAtualLimpa}] fora da diretriz global. Mantendo link oculto.`);
+	          lnkElement.classList.add("hidden");
+	          lnkElement.style.display = "none";
+	        }
+	      }
+	      // =========================================================================
 
 	      // 5. Alimenta ambos os comboboxes com status de carregamento assíncrono
 	      comboLogin.innerHTML = '<option value="" disabled selected>Carregando operadores de ' + UF_SELECIONADA + '...</option>';
@@ -3727,7 +3754,7 @@ function renderizarModalInconsistencias(erros, totalValidos) {
         fecharModalSuporte();
       }
 
-		function checarColunaDispatch() {
+function checarColunaDispatch() {
   // Valida se o Web App da UF selecionada já foi devidamente atribuído
   if (!WEB_APP_URL) {
     console.warn("Aviso: WEB_APP_URL ainda não foi definida.");
@@ -3788,6 +3815,54 @@ function monitorarColunaDispatch24h() {
     });
 }
 
+/**
+ * ETAPA ATUAL: Controla a exibição do link baseado na correspondência da UF
+ * com a variável global UFS_IGNORAR_MONITORAMENTO.
+ */
+function aplicarCondicionalVisualLinkTokens() {
+  // 1. Captura o elemento físico da div/link que você compartilhou
+  const lnkElement = document.getElementById("lnkTokensConf");
+  
+  // Captura a UF selecionada pelo usuário no formulário de login (Ex: "SP", "PR")
+  // Certifique-se de usar a variável ou ID correto do seu campo de seleção
+  const ufSelecionada = document.getElementById("selecaoUF")?.value || selectRegiaoAtiva; 
+
+  if (!lnkElement) {
+    console.error("❌ Erro: Elemento 'lnkTokensConf' não foi localizado no DOM.");
+    return;
+  }
+
+  if (!ufSelecionada) {
+    console.warn("⚠️ Nenhuma UF selecionada ainda. Mantendo estado oculto padrão.");
+    lnkElement.classList.add("hidden");
+    return;
+  }
+
+  // Limpa e padroniza a string da UF selecionada
+  const ufLimpa = ufSelecionada.trim().toUpperCase();
+
+  // 2. Transforma a string global delimitada por vírgula em um Array de checagem pura
+  const listaUfsLiberacaoDireta = UFS_IGNORAR_MONITORAMENTO.split(",").map(item => item.trim().toUpperCase());
+
+  // =========================================================================
+  // 🔍 A NOVA CONDICIONAL DE CORRESPONDÊNCIA (MATCH)
+  // =========================================================================
+  if (listaUfsLiberacaoDireta.includes(ufLimpa)) {
+    // SE DER MATCH: NÃO ESCONDE! Força a exibição imediata do link na interface
+    console.log(`🔓 [MATCH GLOBAL] UF [${ufLimpa}] localizada em UFS_IGNORAR_MONITORAMENTO. Exibindo link direto.`);
+    
+    lnkElement.classList.remove("hidden");
+    lnkElement.style.display = "inline-block"; // Remove a barreira do display: none
+  } else {
+    // SE NÃO DER MATCH: Mantém oculto ou segue para o fluxo de monitoramento da aba
+    console.log(`🔒 [SEM MATCH] UF [${ufLimpa}] não está na lista global. Mantendo oculto por padrão.`);
+    
+    lnkElement.classList.add("hidden");
+    lnkElement.style.display = "none";
+    
+    // (Opcional) Aqui futuramente chamaremos a rotina de varredura da Coluna R se você desejar.
+  }
+}
 
 		
 </script>
