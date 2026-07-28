@@ -634,7 +634,8 @@
 
 	// Lista de UFs que devem IGNORAR o monitoramento DISPATCH ou pular etapas específicas
 	const UFS_RESTRITAS_MONITORAMENTO = "PR"; //FORMATO:"SP,RJ,MG"; 
-		
+	// Variável global temporária para guardar o texto puro do resumo para a função de cópia
+	var textoPuroResumoTemporario = "";	
 	// Variável de controle mestre (Substitui a constante WEB_APP_URL fixa antiga)
 	let WEB_APP_URL = ""; 
 	let UF_SELECIONADA = ""; // Guarda o estado escolhido globalmente no Front-OL
@@ -4037,6 +4038,54 @@ function abrirModalPendentesDireto(uf) {
   }
 }
 
+/**
+ * Controla a renderização de abertura do modal de resumo de envio
+ * @param {String} textoFormatado Texto contendo a lista de Romaneios e Tokens
+ */
+function abrirModalResumoEnvio(textoFormatado) {
+  const modal = document.getElementById("modalResumoEnvio");
+  const msgDiv = document.getElementById("resumoMensagem");
+
+  if (modal && msgDiv) {
+    textoPuroResumoTemporario = textoFormatado; // Armazena para o botão copiar
+    msgDiv.textContent = textoFormatado;       // Injeta com segurança contra quebras de layout
+    
+    modal.style.display = "flex";
+    modal.classList.remove("hidden");
+  }
+}
+
+/**
+ * Fecha o modal de resumo e limpa o input para novos fluxos operacionais
+ */
+function fecharModalResumoEVoltar() {
+  const modal = document.getElementById("modalResumoEnvio");
+  if (modal) {
+    modal.style.display = "none";
+    modal.classList.add("hidden");
+  }
+  // Recarrega ou limpa o formulário de arquivos se julgar necessário
+  const fileInput = document.getElementById('arquivoCSV');
+  if (fileInput) fileInput.value = "";
+}
+
+/**
+ * Executa a cópia atômica da lista gerada para a área de transferência do operador
+ */
+function copiarTextoResumoEnvio() {
+  if (!textoPuroResumoTemporario) {
+    alert("Nenhum dado disponível para cópia.");
+    return;
+  }
+  
+  navigator.clipboard.writeText(textoPuroResumoTemporario)
+    .then(function() {
+      alert("📋 Lista de tokens copiada para a área de transferência com sucesso!");
+    })
+    .catch(function(err) {
+      console.error("Erro ao copiar tokens: ", err);
+    });
+}
 		
 </script>
 
@@ -4101,7 +4150,45 @@ function abrirModalPendentesDireto(uf) {
 	    </div>
 	</div>
 
-    
+	<!-- =========================================================================
+     🆕 NOVO COMPONENTE: MODAL DE RESUMO DE ENVIO (ROMANEIOS E TOKENS)
+     ========================================================================= -->
+	<div id="modalResumoEnvio" class="modal-overlay hidden" style="display: none; align-items: center; justify-content: center; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1010;">
+	    <div class="modal-content" style="text-align: center; max-height: 90vh; display: flex; flex-direction: column; width: 90%; max-width: 480px; padding: 20px; box-sizing: border-box; background: #FFF; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);">
+	        
+	        <!-- TOPO FIXO -->
+	        <div class="success-icon" style="margin-bottom: 5px; color: #8A05BE; font-size: 32px; font-weight: bold;">✓</div>
+	        <h3 id="resumoTitulo" style="color: #8A05BE; margin: 0 0 10px 0;">Carga Processada!</h3>
+	        
+	        <!-- CONTAINER COM ROLAGEM ISOLADA (ANTI-ESTOURO) -->
+	        <div style="overflow-y: auto; max-height: 300px; padding: 10px; border: 1px solid #f0f0f0; border-radius: 6px; background: #fafafa; margin-bottom: 10px;">
+	            <!-- Onde o JavaScript injetará a lista formatada de romaneios e tokens -->
+	            <div id="resumoMensagem" style="font-weight: 500; text-align: left; font-size: 14px; line-height: 1.6; color: #333; white-space: pre-wrap;"></div>
+	        </div>
+	        
+	        <!-- SUBTÍTULO FIXO -->
+	        <p id="resumoSubtitulo" style="font-size: 13px; color: #666; margin: 5px 0 15px 0;">Todos os tokens de conferência foram gerados e armazenados com sucesso.</p>
+	
+	        <!-- RODAPÉ FIXO -->
+	        <div style="padding-top: 15px; border-top: 1px solid #eee; display: flex; justify-content: center; gap: 12px; width: 100%;">
+	            
+	            <!-- 📋 BOTÃO 1: Copiar Resumo -->
+	            <button id="btnCopiarResumoOL" onclick="copiarTextoResumoEnvio()" style="padding: 10px 15px; background: #f4f4f4; color: #333; border: 1px solid #ccc; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 13px; width: 45%;">
+	                📋 Copiar Lista
+	            </button> 
+	        
+	            <!-- 💜 BOTÃO 2: Fechar e Concluir -->
+	            <button id="btnFecharResumoOL" onclick="fecharModalResumoEVoltar()" style="padding: 10px 15px; background: #8A05BE; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 13px; width: 55%; box-shadow: 0 2px 6px rgba(138,5,190,0.3);">
+	                Estou Ciente
+	            </button>
+	            
+	        </div>
+	
+	    </div>
+	</div>
+
+
+	
     <!-- Pop-up de Tokens Pendentes -->
     <div id="modalPendentes" class="modal-overlay hidden" style="display: none; background: rgba(0,0,0,0.5); position: fixed; inset: 0; align-items: center; justify-content: center; z-index: 1000;">
         <div class="modal-content" style="background: white; padding: 25px; border-radius: 8px; max-width: 400px; width: 100%; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">
