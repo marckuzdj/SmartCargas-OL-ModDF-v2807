@@ -330,7 +330,7 @@
           <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 11.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
         </svg>
       </div>
-      <h2 style="color: #8A05BE; margin: 0; font-size: 22px; font-weight: bold;">Passagem de Carga ModDF_v2807.2</h2>
+      <h2 style="color: #8A05BE; margin: 0; font-size: 22px; font-weight: bold;">Passagem de Carga ModDF_v2807.3</h2>
       <p style="color: #666; margin: 5px 0 0 0; font-size: 14px;">Selecione o estado de expedição</p>
     </div>
 
@@ -2555,13 +2555,16 @@ window.addEventListener('beforeunload', function (event) {
 	      // =========================================================================
 	      const lnkElement = document.getElementById("lnkTokensConf");
 	      if (lnkElement) {
+	        // Puxa exatamente a sua constante declarada no topo: UFS_RESTRITAS_MONITORAMENTO
+	        const diretrizGlobal = (typeof UFS_RESTRITAS_MONITORAMENTO !== 'undefined') ? UFS_RESTRITAS_MONITORAMENTO : "";
+	        
 	        // Transforma a constante delimitada por vírgula em um array limpo
-	        const listaUfsExibirDireto = UFS_IGNORAR_MONITORAMENTO.split(",").map(item => item.trim().toUpperCase());
+	        const listaUfsExibirDireto = diretrizGlobal.split(",").map(function(item) { return item.trim().toUpperCase(); });
 	        const ufAtualLimpa = UF_SELECIONADA.trim().toUpperCase();
 
-	        if (listaUfsExibirDireto.includes(ufAtualLimpa)) {
-	          // SE DER MATCH: NÃO ESCONDE! Força a exibição imediata na interface
-	          console.log(`🔓 [MATCH GLOBAL] UF [${ufAtualLimpa}] cadastrada em UFS_IGNORAR_MONITORAMENTO. Exibindo link.`);
+	        if (listaUfsExibirDireto.includes(ufAtualLimpa) && ufAtualLimpa !== "") {
+	          // SE DER MATCH (Ex: "PR"): NÃO ESCONDE! Força a exibição imediata na interface
+	          console.log(`🔓 [MATCH GLOBAL] UF [${ufAtualLimpa}] cadastrada em UFS_RESTRITAS_MONITORAMENTO. Exibindo link.`);
 	          lnkElement.classList.remove("hidden");
 	          lnkElement.style.display = "inline-block"; // Garante a renderização visual
 	        } else {
@@ -2571,6 +2574,8 @@ window.addEventListener('beforeunload', function (event) {
 	          lnkElement.style.display = "none";
 	        }
 	      }
+	      // =========================================================================
+
 	      // =========================================================================
 
 	      // 5. Alimenta ambos os comboboxes com status de carregamento assíncrono
